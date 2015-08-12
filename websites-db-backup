@@ -2,19 +2,6 @@
 #
 # Website Backup Script for LOCAL
 #
-# Add this script as a cronjob to run daily. It creates an archive of incremental
-# backups, with the current date set as the name of the backup directory.
-# Assumes the script is run from /usr/local/sbin, with 755 permissions, owned by root.
-#
-# Cronjob:
-# ~~~
-# # setup cronjob:
-# crontab -e
-#
-# # Then enter:
-# 0 12 * * * /usr/local/sbin/websites-db-backup
-# ~~~
-#
 # rsync Options
 # -a, --archive               archive mode; equals -rlptgoD (no -H,-A,-X)
 # -v, --verbose               increase verbosity
