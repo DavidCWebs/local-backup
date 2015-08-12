@@ -3,7 +3,7 @@ These backup scripts were developed for my own needs. They are an offshoot of a 
 
 I use them to back up Ubuntu 14.04 desktop - which is used primarily for web-development on a local LAMP stack. The scripts should work on any Linux box.
 
-I know there are existing programmes that carry out a similar function. The objective here was to build a backup solution that is:
+The objective was to build a backup solution that is:
 
 * Lightweight - using simple resources and minimal diskspace
 * "fire and forget" - once configured, it should just run with minimal input
