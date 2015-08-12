@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# Manually set up $LNK for first run
+# ------------------------------------------------------------------------------
+# ln -s /media/david/storage/david-home-backup/<LAST DIR> /media/david/storage/david-home-backup/current
+#
+# For example:
+# ln -s /media/david/storage/david-home-backup/david-home-backup-2015-07-10-19:13:32 /media/david/storage/david-home-backup/current
+
+# Set variables
+# ------------------------------------------------------------------------------
+
+# Path of the storage drive
+STORAGE="/media/david/storage"
+
+# UUID of the storage drive - in Ubuntu, `sudo blkid` should give you what you need
+UUID="66a98f92-f76c-44f2-99af-53a6600a8bbc"
+
+# Pathe to backup
+BACKUP_PATH="${STORAGE}/david-home-backup"
+
+# Timestamp
+DATE=$(date "+%Y-%m-%d-%H:%M:%S")
+
+# Source for rsync: set home directory here.
+SOURCE="/home/david/"
+
+# Send a Message
+# ------------------------------------------------------------------------------
+export DISPLAY=:0
+export XAUTHORITY=~/.Xauthority
+notify-send "Starting a Backup. Get Ready!"
+
+# Check Storage Drive is mounted - if it isn't mount it
+# ------------------------------------------------------------------------------
+if grep -qs $STORAGE /proc/mounts; then
+
+  MOUNTED=true
+  notify-send "Storage Drive is mounted. Going to backup ${SOURCE} to ${BACKUP_PATH}/${DATE}"
+
+else
+
+  MOUNTED=false
+  notify-send "Storage Drive is not mounted. Mounting..."
+  sudo mkdir -p "${STORAGE}"
+  sudo mount /dev/disk/by-uuid/$UUID "${STORAGE}"
+
+fi
+
+# The guts of the backup - the rsync command
+# ------------------------------------------------------------------------------
+rsync -aP --delete --exclude-from=/home/david/.backup-settings/excludes.txt --link-dest=${BACKUP_PATH}/current $SOURCE ${BACKUP_PATH}/${DATE} 2>  ${BACKUP_PATH}/${DATE}-rsync-report
+
+# Remove the symlink
+rm -f ${BACKUP_PATH}/current
+
+# Make the symlink for the -link-dest comparison on the next run
+ln -s $DATE ${BACKUP_PATH}/current
+
+# Phew - we're finished!
+notify-send "Backup Finished."
