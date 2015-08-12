@@ -18,6 +18,10 @@ There are two bash scripts in this repo:
 * `backup-home-directory`: Incremental backup of the users home directory to a storage drive
 * `websites-db-backup`: Incremental backup of local development sites and hot-backup of MySQL databases
 
+Both scripts use `rsync` for the incremental backup, with the `--link-dest` option. The directory specified by --link-dest is used as a reference point, and any files in source that are unchanged relative to this reference point are hardlinked to their exisiting inode in the reference directory.
+
+The incremental nature of the backup is very space-efficient. For example, 35 incremental daily backups of a 87G home directory uses 195G of storage space. This is made possible by hard-linking the unchanged files - which results in the whole backup being less than the sum of the parts.
+
 ##Development Websites Backup
 The `websites-db-backup` script backs up all files in the Apache root directory (in my case`/var/www`).
 
@@ -48,11 +52,6 @@ crontab -e
 
 # Save and exit
 ~~~
-
-##Utilities
-Both scripts use `rsync` for the incremental backup, with the `--link-dest` option. The directory specified by --link-dest is used as a reference point, and any files in source that are unchanged relative to this reference point are hardlinked to their exisiting inode in the reference directory.
-
-The database backup uses `mysqldump`.
 
 ##Resources
 I did quite a bit of research for these scripts. Here are some of the articles and resources used:
