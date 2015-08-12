@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# Website Backup Script for LOCAL
+#
+# Add this script as a cronjob to run daily. It creates an archive of incremental
+# backups, with the current date set as the name of the backup directory.
+# Assumes the script is run from /usr/local/sbin, with 755 permissions, owned by root.
+#
+# Cronjob:
+# ~~~
+# # setup cronjob:
+# crontab -e
+#
+# # Then enter:
+# 0 12 * * * /usr/local/sbin/websites-db-backup
+# ~~~
+#
+# rsync Options
+# -a, --archive               archive mode; equals -rlptgoD (no -H,-A,-X)
+# -v, --verbose               increase verbosity
+# -h, --human-readable        output numbers in a human-readable format
+# -L, --copy-links            transform symlink into referent file/dir
+# -O, --omit-dir-times        omit directories from --times
+#
+#
+# The source directory should contain a symlink to Apache doc root.
+# You'll probably need to manually set up $LNK for first run, e.g.:
+# `ln -s /media/david/storage/local-site-backups/backup/2015-07-09 /media/david/storage/local-site-backups/backup/current`
+# ------------------------------------------------------------------------------
+
+# Setup variables
+# ------------------------------------------------------------------------------
+# Timestamp for directory name
+TIMESTAMP=$(date "+%Y-%m-%d-%H:%M:%S")
+
+# The source for rsync
+SRC="/media/david/storage/local-site-backups/source/"
+
+# Local MySQL password
+PASSWORD="LOCALMYSQLPASSWORDXXXXXX"
+
+# Local MySQL hostname
+HOST="localhost"
+
+# Path to the backed up databases - NB this isn't the final destination
+DB_BACKUP_PATH="${SRC}sql"
+
+# The storage directory
+STORAGE="/media/david/storage/local-site-backups/backup"
+
+# Build an array of databases
+DATABASES=$(mysql --user=$USER --password=$PASSWORD -e "SHOW DATABASES;" | grep -Ev "(Database|information_schema)")
+
+# The target directory
+TRG="${STORAGE}/${TIMESTAMP}"
+
+# The link destination directory: Used to compare changes
+LNK="${STORAGE}/current"
+
+# HOT-BACKUP DATABASES
+# ------------------------------------------------------------------------------
+# Remove previous dumped databases
+rm $DB_BACKUP_PATH/*
+
+# Create dumps for each database
+for DB in $DATABASES
+do
+  mysqldump --user=$USER --password=$PASSWORD --single-transaction --host=$HOST $DB > $DB_BACKUP_PATH/$DB.sql
+done
+
+# Add a datestamped readme to the database directory
+echo "Databases Backed up on ${TIMESTAMP}." > $DB_BACKUP_PATH/README-${TIMESTAMP}.md
+
+# The rsync options: follow the symlinks to make a hard backup
+# Exclude zip files (otherwise backupbuddy will cause enormous backups)
+# ------------------------------------------------------------------------------
+OPT=(-avL --progress --delete --exclude='*.zip' --link-dest=$LNK)
+
+# Execute the backup
+# ------------------------------------------------------------------------------
+
+rsync "${OPT[@]}" $SRC $TRG
+
+rm -f $STORAGE/current
+ln -s $TRG $STORAGE/current
