@@ -23,7 +23,7 @@ TIMESTAMP=$(date "+%Y-%m-%d-%H:%M:%S")
 # The source for rsync
 SRC="/media/david/storage/local-site-backups/source/"
 
-# Local MySQL password
+# Local MySQL password for root MySQL user
 PASSWORD="LOCALMYSQLPASSWORDXXXXXX"
 
 # Local MySQL hostname
@@ -36,7 +36,7 @@ DB_BACKUP_PATH="${SRC}sql"
 STORAGE="/media/david/storage/local-site-backups/backup"
 
 # Build an array of databases
-DATABASES=$(mysql --user=$USER --password=$PASSWORD -e "SHOW DATABASES;" | grep -Ev "(Database|information_schema)")
+DATABASES=$(mysql --user=root --password=$PASSWORD -e "SHOW DATABASES;" | grep -Ev "(Database|information_schema)")
 
 # The target directory
 TRG="${STORAGE}/${TIMESTAMP}"
@@ -52,7 +52,7 @@ rm $DB_BACKUP_PATH/*
 # Create dumps for each database
 for DB in $DATABASES
 do
-  mysqldump --user=$USER --password=$PASSWORD --single-transaction --host=$HOST $DB > $DB_BACKUP_PATH/$DB.sql
+  mysqldump --user=root --password=$PASSWORD --single-transaction --host=$HOST $DB > $DB_BACKUP_PATH/$DB.sql
 done
 
 # Add a datestamped readme to the database directory
