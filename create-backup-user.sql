@@ -7,7 +7,7 @@
 mysql -u root -p
 
 # In the MySQL shell enter:
-CREATE USER 'backup_user'@'localhost' IDENTIFIED BY 'CiCHVQ2o8TSCq31SbWhQBkmn6';
+CREATE USER 'backup_user'@'localhost' IDENTIFIED BY 'nicelongpassword';
 GRANT SELECT, SHOW VIEW, RELOAD, REPLICATION CLIENT, EVENT, TRIGGER ON *.* TO 'backup_user'@'localhost';
 FLUSH PRIVILEGES;
 SHOW GRANTS FOR 'backup_user'@'localhost';
