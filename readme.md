@@ -32,20 +32,6 @@ The backup uses `rsync` with the `--link-dest` option to make an incremental bac
 
 This makes for a very efficient backup - though the database dump could probably be refined (pull requests welcome).
 
-Add the script to `/usr/local/sbin` and run it under root by means of a crontab:
-
-~~~
-mv websites-db-backup /usr/local/sbin
-sudo chmod u+x /usr/local/sbin/websites-db-backup
-
-# Open crontable
-sudo crontab -e
-
-# Add the following to the crontab, save and exit
-# Run backup script every day at 3 am
-00 03 * * * /usr/local/sbin/websites-db-backup
-~~~
-
 ## Home Directory Backup
 This creates an archive of incremental backups, with the current date set as the name of the backup directory.
 
@@ -59,6 +45,7 @@ Add both scripts to `/usr/local/sbin`. Scripts should be owned by root, with 755
 Add the scripts as a cronjob to run daily:
 
 ~~~
+
 # setup cronjob:
 crontab -e
 
