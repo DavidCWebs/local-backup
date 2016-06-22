@@ -1,8 +1,8 @@
 Local Backup Utilities: Ubuntu LAMP Stack
 ==========================================
-These backup scripts were developed for my own needs. They are an offshoot of a wider customised server backup project that I built recently.
+These backup scripts were developed for my own needs. They are an offshoot of a wider customised server backup project that I built.
 
-I use them to back up Ubuntu 14.04 desktop - which is used primarily for web-development on a local LAMP stack. The scripts should work on any Linux box.
+I've recently made some refinements to make the scripts more easily deployable. They're still being tested on Ubuntu 16.04, so use with caution.
 
 The objective was to build a backup solution that is:
 
