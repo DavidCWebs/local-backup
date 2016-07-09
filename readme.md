@@ -2,9 +2,9 @@ Local Backup Utilities: Ubuntu LAMP Stack
 ==========================================
 These backup scripts were developed for my own needs. They are an offshoot of a wider customised server backup project that I built.
 
-I've recently made some refinements to make the scripts more easily deployable. They're still being tested on Ubuntu 16.04, so use with caution.
+I've recently made some refinements to make the scripts more easily deployable. I use these scripts on **Ubuntu 16.04 Xenial Xerus**.
 
-The objective was to build a backup solution that is:
+The objective was to build backup solutions that are:
 
 * Lightweight - using simple resources and minimal diskspace
 * "fire and forget" - once configured, it should just run with minimal input
