@@ -55,6 +55,9 @@ crontab -e
 # Save and exit
 ~~~
 
+## TODO
+Fix delete old copies - the `rm` command does not run properly under a crontab.
+
 ## Resources
 I did quite a bit of research for these scripts. Here are some of the articles and resources used.
 
