@@ -41,6 +41,7 @@ I got the idea for this script [here](https://blog.interlinked.org/tutorials/rsy
 
 ## How to Use
 Add both scripts to `/usr/local/sbin`. Scripts should be owned by root, with 755 permissions.
+Copy `sample-config` to `config` and enter your values.
 
 Add the scripts as a cronjob to run daily:
 

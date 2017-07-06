@@ -22,33 +22,21 @@
 
 # Config
 # ------------------------------------------------------------------------------
-DOCROOT="/var/www/html" # The server document root to be backed up - in this case, Apache
+# Set directory and include config variables
+THIS=$(readlink -f ${BASH_SOURCE[0]})
+PROJECT_DIR=$(dirname $THIS)
+. "$PROJECT_DIR/config"
 
-PARENT="/media/david/storage/dev-site-backups" # Location of the backup - no trailing slash
-
-HOST="localhost" # Local MySQL hostname
-
-USER="backup_user" # MySQL backup username
-
-PASSWORD="nicelongpassword" # MySQL backup user password
-
-NUMBER_TO_KEEP=5 # The number of backups to keep. Older backups will be removed
-
-# No Edit - you probably don't need to edit below this line
+# NOTICE - you probably don't need to edit below this line
 # ------------------------------------------------------------------------------
 RETAIN_NUMBER=$(( $NUMBER_TO_KEEP + 2 )) # Correction to account for n+1 and the `current` directory
-
 SRC="${PARENT}/source/" # The source for rsync
-
 STORAGE="${PARENT}/backup" # The storage directory
-
 TIMESTAMP=$(date "+%Y-%m-%d-%H:%M:%S") # Timestamp for directory name:
-
 DB_SRC="${SRC}sql" # Path to the dumped databases - NB this isn't the final destination
-
 TRG="${STORAGE}/${TIMESTAMP}" # The target directory
-
 LNK="${STORAGE}/current" # The link destination directory: Used to compare changes
+HOSTNAME=$(hostname)
 
 mkdir -p $SRC # This will also create $PARENT as well if it doesn't exist
 mkdir -p $STORAGE # Backup directory
@@ -58,86 +46,64 @@ mkdir -p $LNK # The comparison directory used as the rsync `--link-dest`
 ln -s $DOCROOT $SRC # Create a symlink to $DOCROOT in $SRC
 
 # ------------------------------------------------------------------------------
-# Dump databases into $PARENT/$SOURCE directory
-#
+# Dump databases into $PARENT/$SOURCE directory.
 # Uses mysqldump, backs up databases individually.
-#
 # ------------------------------------------------------------------------------
 function dump_databases_into_source {
-
   # Get an array of databases, but not 'Database' or 'information_schema'
-  DATABASES=$(mysql --user=$USER --password=$PASSWORD -e "SHOW DATABASES;" | grep -Ev "(Database|information_schema)")
-
+  DATABASES=$(mysql --user=$DB_USER --password=$PASSWORD -e "SHOW DATABASES;" | grep -Ev "(Database|information_schema)")
   DUMPFAIL=false
 
-  # Remove previous dumped databases
+  # Remove previously dumped databases
   rm $DB_SRC/*
-
   # Set up a log
   echo "Database backup report. ${TIMESTAMP}" > $DB_SRC/DB_LOG
   echo "=======================================" >> $DB_SRC/DB_LOG
 
   # Create dumps for each database
-  for DB in $DATABASES
+  for DB in ${DATABASES}
   do
-
-    mysqldump --user=$USER --password=$PASSWORD --single-transaction --host=$HOST $DB > $DB_SRC/$DB.sql
-
+    mysqldump --user=${DB_USER} --password=${PASSWORD} --single-transaction --host=${HOST} ${DB} > ${DB_SRC}/${DB}.sql
     # Log the result of mysqldump
     if [[ $? -eq 0 ]]
-
     then
-
       echo -e "Mysqldump created ${DB}.sql on ${TIMESTAMP}." >> $DB_SRC/DB_LOG
-
     else
-
-      echo "Mysqldump encountered a problem backing up ${DB} on ${TIMESTAMP}. Look in ${DB_BACKUP_PATH}/${DB}.log for information." >> $DB_SRC/DB_LOG
+      echo "Mysqldump encountered a problem backing up ${DB} on ${TIMESTAMP}. Look in ${TRG}/sql/${DB}.log for information." >> $DB_SRC/DB_LOG
       $DUMPFAIL=true
-
     fi
-
   done
-
 }
 
 # ------------------------------------------------------------------------------
-# Rsync the source directory to the backup directory - the last backup used as comparator
-#
+# Rsync the source directory to the backup directory - the last backup used as comparator.
 # The rsync options: follow the symlinks to make a hard backup.
 # Exclude zip files (otherwise backupbuddy will cause enormous backups)
 # ------------------------------------------------------------------------------
 function rsync_backup {
-
   OPT=(-avL --progress --delete --exclude='*.zip' --link-dest=$LNK) # rsync options
-
   rsync "${OPT[@]}" $SRC $TRG
-
+  true
   # Log Results of Rsync
   if [[ $? -gt 0 ]]
   then
     # rsync Failure condition
     echo "ERROR. rsync didn't complete the proper backup: ${TIMESTAMP}" >> /var/log/server-backup.log
-    # enable the next line for the server version, or if you've set up a local mailserver
-    # echo "There was an error in the nightly backup for XXX: ${TIMESTAMP}"| mail -s "Backup Error, XXX" info@example.com
+    # Send an email
+    echo "There was an error in the backup for ${HOSTNAME}: ${TIMESTAMP}. See /var/log/server-backup.log for more info."| mail -s "Backup Error, ${HOSTNAME}" ${EMAIL}
   else
     # rsync Success condition
     if [[ false == $DUMPFAIL ]]
-
+    then
       # rsync & mysqldump worked OK
-      then
-        echo "SUCCESS. Backup made on: ${TIMESTAMP}" >> /var/log/server-backup.log
-        #echo -e "${TIMESTAMP}: Server XXX successfully ran a local backup.\nBoth rsync & mysqldump report success."| mail -s "Backup Success, XXX" info@example.com
-
+      echo "SUCCESS. Backup made on: ${TIMESTAMP}" >> /var/log/server-backup.log
+      echo -e "${TIMESTAMP}: Server ${HOSTNAME} successfully ran a local backup.\nBoth rsync & mysqldump report success."| mail -s "Backup Success, ${HOSTNAME}" ${EMAIL}
+    else
       # rsync worked but there was at least one mysqldump error
-      else
-        echo "PARTIAL SUCCESS. File backup (rsync) was successful, but mysqldump reports errors: ${TIMESTAMP}" >> /var/log/server-backup.log
-        #echo -e "${TIMESTAMP}: Server XXX ran a local backup.\nFile backup reports success, however mysqldump reports at least one problem.\nCheck "| mail -s "Backup Success, XXX" info@example.com
-
+      echo "PARTIAL SUCCESS. File backup (rsync) was successful, but mysqldump reports errors: ${TIMESTAMP}" >> /var/log/server-backup.log
+      echo -e "${TIMESTAMP}: Server ${HOSTNAME} ran a local backup.\nFile backup reports success, however mysqldump reports at least one problem.\nCheck ${TRG}/sql for more info."| mail -s "Backup Success, ${HOSTNAME}" ${EMAIL}
     fi
-
   fi
-
 }
 
 # ------------------------------------------------------------------------------
@@ -150,10 +116,8 @@ function rsync_backup {
 # See: http://stackoverflow.com/a/34862475
 # ------------------------------------------------------------------------------
 function setup_for_next_run {
-
   rm -f $STORAGE/current/*
   ln -s $TRG $STORAGE/current
-
 }
 
 # ------------------------------------------------------------------------------
@@ -162,13 +126,10 @@ function setup_for_next_run {
 # Retains n directories, set in the config area of this script.
 # ------------------------------------------------------------------------------
 function delete_oldest_n_copies {
-
   cd $STORAGE
-
   # Dry Run
   #ls -cpr $STORAGE | head -n +$RETAIN_NUMBER | xargs -d '\n' echo rm -rf --
   ls -cpr $STORAGE | head -n -$RETAIN_NUMBER | xargs -d '\n' rm -rf
-
 }
 
 dump_databases_into_source

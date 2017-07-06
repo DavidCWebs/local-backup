@@ -1,0 +1,13 @@
+DOCROOT="/var/www/html" # The server document root to be backed up - in this case, Apache
+
+PARENT="/media/datadrive/local-site-backups" # Location of the backup - no trailing slash
+
+HOST="localhost" # Local MySQL hostname
+
+DB_USER="backup_user" # MySQL backup username
+
+PASSWORD="yourpasswordhere" # MySQL backup user password
+
+NUMBER_TO_KEEP=5 # The number of backups to keep. Older backups will be removed
+
+EMAIL="you@example.com"
