@@ -1,61 +1,91 @@
 #!/bin/bash
-#
-# Manually set up $LNK for first run
+# Backup the current user's home directory to a storage drive.
 # ------------------------------------------------------------------------------
-# ln -s /media/david/storage/david-home-backup/<LAST DIR> /media/david/storage/david-home-backup/current
-#
-# For example:
-# ln -s /media/david/storage/david-home-backup/david-home-backup-2015-07-10-19:13:32 /media/david/storage/david-home-backup/current
-
-# Set variables
-# ------------------------------------------------------------------------------
-
-# Path of the storage drive
-STORAGE="/media/david/storage"
-
-# UUID of the storage drive - in Ubuntu, `sudo blkid` should give you what you need
-UUID="66a98f92-f76c-44f2-99af-53a6600a8bbc"
-
-# Pathe to backup
-BACKUP_PATH="${STORAGE}/david-home-backup"
-
-# Timestamp
-DATE=$(date "+%Y-%m-%d-%H:%M:%S")
-
-# Source for rsync: set home directory here.
-SOURCE="/home/david/"
-
-# Send a Message
-# ------------------------------------------------------------------------------
-export DISPLAY=:0
-export XAUTHORITY=~/.Xauthority
-notify-send "Starting a Backup. Get Ready!"
-
-# Check Storage Drive is mounted - if it isn't mount it
-# ------------------------------------------------------------------------------
-if grep -qs $STORAGE /proc/mounts; then
-
-  MOUNTED=true
-  notify-send "Storage Drive is mounted. Going to backup ${SOURCE} to ${BACKUP_PATH}/${DATE}"
-
+if [[ -z $1 ]]; then
+  CURRENT_USER=$USER;
 else
-
-  MOUNTED=false
-  notify-send "Storage Drive is not mounted. Mounting..."
-  sudo mkdir -p "${STORAGE}"
-  sudo mount /dev/disk/by-uuid/$UUID "${STORAGE}"
-
+  CURRENT_USER=$1
 fi
-
-# The guts of the backup - the rsync command
+# Set config variables and make directories/symlinks
 # ------------------------------------------------------------------------------
-rsync -aP --delete --exclude-from=/home/david/.backup-settings/excludes.txt --link-dest=${BACKUP_PATH}/current $SOURCE ${BACKUP_PATH}/${DATE} 2>  ${BACKUP_PATH}/${DATE}-rsync-report
+function setup {
+  THIS=$(readlink -f ${BASH_SOURCE[0]})
+  PROJECT_DIR=$(dirname $THIS)
+  . "$PROJECT_DIR/config"
+  EXCLUDE_LIST="/home/$CURRENT_USER/.backup-settings/excludes.txt"
+  RETAIN_NUMBER=8 # Remember to account for n+1 and the `current` dir
+  SRC="/home/$CURRENT_USER/" # The source for rsync
+  TIMESTAMP=$(date "+%Y-%m-%d-%H:%M:%S") # Timestamp for directory name
+  STORAGE="${PARENT}/home/$CURRENT_USER/backup" # The storage directory
+  LOGS="${STORAGE}/rsync-logs"
+  LOGFILE="${LOGS}/${TIMESTAMP}"
+  TRG="${STORAGE}/${TIMESTAMP}" # The target directory
+  LNK="${STORAGE}/current" # The link destination directory: Used to compare changes
 
-# Remove the symlink
-rm -f ${BACKUP_PATH}/current
+  # Check Storage Drive is mounted - if it isn't mount it
+  if grep -qs ${PARENT} /proc/mounts; then
+    MOUNTED=true
+    notify-send "Storage Drive is mounted. Backing up ${SRC} to ${TRG}"
+  else
+    MOUNTED=false
+    notify-send "Storage Drive is not mounted. Mounting..."
+    sudo mkdir -p "${STORAGE}"
+    sudo mount /dev/disk/by-uuid/$UUID "${STORAGE}"
+  fi
 
-# Make the symlink for the -link-dest comparison on the next run
-ln -s $DATE ${BACKUP_PATH}/current
+  mkdir -p $STORAGE # Backup directory
+  mkdir -p $LOGS # Rsync logs stored here
+  mkdir -p $TRG # Final backup location, subdir of $STORAGE
+  mkdir -p $LNK # The comparison directory used as the rsync `--link-dest`
+}
 
-# Phew - we're finished!
-notify-send "Backup Finished."
+function transfer_files {
+  echo "Backup Home Directory Rsync Report" >> ${LOGFILE}
+  echo "==================================" >> ${LOGFILE}
+  echo "Time: ${TIMESTAMP}" >> ${LOGFILE}
+  echo "Computer: ${HOSTNAME}" >> ${LOGFILE}
+  echo "Rsync --link-dest: ${LNK}" >> ${LOGFILE}
+  echo "----------------------------------" >> ${LOGFILE}
+  # --exclude-from=${EXCLUDE_LIST} --stats
+  # OPT=(-avL --delete --link-dest=${LNK})
+  OPT=(-rltDv --info=COPY1,BACKUP1,SKIP2,FLIST2 --link-dest=${LNK})
+  rsync "${OPT[@]}" ${SRC} ${TRG} 2>&1 >> ${LOGFILE} # Append STDERR and STDOUT to a single logfile
+}
+
+# Remove the symlink to the target directory from `$STORAGE/current` and add a
+# symlink to the most recent copied directory to `$STORAGE/current`.This allows
+# rsync to use the most recent backup as the `--link-dest` comparison on the
+# next run. See: http://stackoverflow.com/a/34862475
+# ------------------------------------------------------------------------------
+function setup_for_next_run {
+  rm -rf $STORAGE/current
+  ln -s $TRG $STORAGE/current
+}
+
+# Retains n directories. Set `$RETAIN_NUMBER` in the config area of this script.
+# ------------------------------------------------------------------------------
+function delete_oldest_n_copies {
+  cd $STORAGE
+  # Dry Run: Enable next line
+  # ls -cpr $STORAGE | head -n +$RETAIN_NUMBER | xargs -d '\n' echo rm -rf --
+  ls -cpr $STORAGE | head -n -$RETAIN_NUMBER | xargs -d '\n' rm -rf
+}
+
+function start_message {
+  export DISPLAY=:0
+  export XAUTHORITY=~/.Xauthority
+  notify-send "Starting a Backup. Get Ready!"
+}
+
+function finish_message {
+  export DISPLAY=:0
+  export XAUTHORITY=~/.Xauthority
+  notify-send "Backup Finished."
+}
+
+start_message
+setup
+transfer_files
+setup_for_next_run
+delete_oldest_n_copies
+finish_message
