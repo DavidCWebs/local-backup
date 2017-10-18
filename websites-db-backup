@@ -30,8 +30,8 @@ PROJECT_DIR=$(dirname $THIS)
 # NOTICE - you probably don't need to edit below this line
 # ------------------------------------------------------------------------------
 RETAIN_NUMBER=$(( $NUMBER_TO_KEEP + 2 )) # Correction to account for n+1 and the `current` directory
-SRC="${PARENT}/source/" # The source for rsync
-STORAGE="${PARENT}/backup" # The storage directory
+SRC="${PARENT}/local-site-backups/source/" # The source for rsync
+STORAGE="${PARENT}/local-site-backups/backup" # The storage directory
 TIMESTAMP=$(date "+%Y-%m-%d-%H:%M:%S") # Timestamp for directory name:
 DB_SRC="${SRC}sql" # Path to the dumped databases - NB this isn't the final destination
 TRG="${STORAGE}/${TIMESTAMP}" # The target directory
@@ -116,7 +116,7 @@ function rsync_backup {
 # See: http://stackoverflow.com/a/34862475
 # ------------------------------------------------------------------------------
 function setup_for_next_run {
-  rm -f $STORAGE/current/*
+  rm -rf $STORAGE/current
   ln -s $TRG $STORAGE/current
 }
 
