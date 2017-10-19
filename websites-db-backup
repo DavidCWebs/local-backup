@@ -93,11 +93,12 @@ function rsync_backup {
     echo "There was an error in the backup for ${HOSTNAME}: ${TIMESTAMP}. See /var/log/server-backup.log for more info."| mail -s "Backup Error, ${HOSTNAME}" ${EMAIL}
   else
     # rsync Success condition
+    FINISHED=$(date "+%Y-%m-%d-%H:%M:%S")
     if [[ false == $DUMPFAIL ]]
     then
       # rsync & mysqldump worked OK
       echo "SUCCESS. Backup made on: ${TIMESTAMP}" >> /var/log/server-backup.log
-      echo -e "${TIMESTAMP}: Server ${HOSTNAME} successfully ran a local backup.\nBoth rsync & mysqldump report success."| mail -s "Backup Success, ${HOSTNAME}" ${EMAIL}
+      echo -e "Server ${HOSTNAME} successfully ran a local backup of websites and databases.\nBoth rsync & mysqldump report success.\nStarted: ${TIMESTAMP}. Finished: ${FINISHED}"| mail -s "Backup Success: websites: ${HOSTNAME}" ${EMAIL}
     else
       # rsync worked but there was at least one mysqldump error
       echo "PARTIAL SUCCESS. File backup (rsync) was successful, but mysqldump reports errors: ${TIMESTAMP}" >> /var/log/server-backup.log
