@@ -18,32 +18,36 @@
 # you to safely add the MySQL user password in this script, which is essential when
 # the script is adapted for use on a public-facing server. See `create-backup-user.sql`
 # in this repo for instructions on creating a MySQL backup user.
-# ------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
 # Config
 # ------------------------------------------------------------------------------
-# Set directory and include config variables
 THIS=$(readlink -f ${BASH_SOURCE[0]})
 PROJECT_DIR=$(dirname $THIS)
 . "$PROJECT_DIR/config"
 
-# NOTICE - you probably don't need to edit below this line
-# ------------------------------------------------------------------------------
 RETAIN_NUMBER=$(( $NUMBER_TO_KEEP + 2 )) # Correction to account for n+1 and the `current` directory
 SRC="${PARENT}/local-site-backups/source/" # The source for rsync
 STORAGE="${PARENT}/local-site-backups/backup" # The storage directory
 TIMESTAMP=$(date "+%Y-%m-%d-%H:%M:%S") # Timestamp for directory name:
 DB_SRC="${SRC}sql" # Path to the dumped databases - NB this isn't the final destination
 TRG="${STORAGE}/${TIMESTAMP}" # The target directory
-LNK="${STORAGE}/current" # The link destination directory: Used to compare changes
+LNK="${STORAGE}/current" # The link destination directory: Used to compare changes with `--link-dest`
 HOSTNAME=$(hostname)
+LOGS="${PARENT}/local-site-backups/rsync-logs"
+LOGFILE="${LOGS}/${TIMESTAMP}"
+DOCROOT_BASE=$(basename ${DOCROOT})
 
 mkdir -p $SRC # This will also create $PARENT as well if it doesn't exist
 mkdir -p $STORAGE # Backup directory
 mkdir -p $DB_SRC # Database backup subdirectory
 mkdir -p $TRG # Final backup location, subdir of $STORAGE
 mkdir -p $LNK # The comparison directory used as the rsync `--link-dest`
-ln -s $DOCROOT $SRC # Create a symlink to $DOCROOT in $SRC
+mkdir -p $LOGS # Rsync logs stored here
+if [[ ! -L ${SRC}/${DOCROOT_BASE} ]]; then
+  # Create a symlink to $DOCROOT in $SRC if it doesn't already exist
+  ln -s $DOCROOT $SRC
+fi
 
 # ------------------------------------------------------------------------------
 # Dump databases into $PARENT/$SOURCE directory.
@@ -54,17 +58,13 @@ function dump_databases_into_source {
   DATABASES=$(mysql --user=$DB_USER --password=$PASSWORD -e "SHOW DATABASES;" | grep -Ev "(Database|information_schema)")
   DUMPFAIL=false
 
-  # Remove previously dumped databases
-  rm $DB_SRC/*
-  # Set up a log
+  rm $DB_SRC/* # Remove previously dumped databases
   echo "Database backup report. ${TIMESTAMP}" > $DB_SRC/DB_LOG
   echo "=======================================" >> $DB_SRC/DB_LOG
 
-  # Create dumps for each database
   for DB in ${DATABASES}
   do
     mysqldump --user=${DB_USER} --password=${PASSWORD} --single-transaction --host=${HOST} ${DB} > ${DB_SRC}/${DB}.sql
-    # Log the result of mysqldump
     if [[ $? -eq 0 ]]
     then
       echo -e "Mysqldump created ${DB}.sql on ${TIMESTAMP}." >> $DB_SRC/DB_LOG
@@ -78,19 +78,18 @@ function dump_databases_into_source {
 # ------------------------------------------------------------------------------
 # Rsync the source directory to the backup directory - the last backup used as comparator.
 # The rsync options: follow the symlinks to make a hard backup.
-# Exclude zip files (otherwise backupbuddy will cause enormous backups)
+# Exclude zip files.
+# Append STDERR and STDOUT to a single logfile.
 # ------------------------------------------------------------------------------
 function rsync_backup {
-  OPT=(-avL --progress --delete --exclude='*.zip' --link-dest=$LNK) # rsync options
-  rsync "${OPT[@]}" $SRC $TRG
-  true
-  # Log Results of Rsync
+  OPT=(-aL --progress --delete --exclude='*.zip' --link-dest=$LNK) # rsync options
+  rsync "${OPT[@]}" $SRC $TRG 2>&1 >> ${LOGFILE}
+  # true
   if [[ $? -gt 0 ]]
   then
     # rsync Failure condition
-    echo "ERROR. rsync didn't complete the proper backup: ${TIMESTAMP}" >> /var/log/server-backup.log
-    # Send an email
-    echo "There was an error in the backup for ${HOSTNAME}: ${TIMESTAMP}. See /var/log/server-backup.log for more info."| mail -s "Backup Error, ${HOSTNAME}" ${EMAIL}
+    echo "ERROR. rsync didn't complete the proper websites backup: ${TIMESTAMP}" >> /var/log/server-backup.log
+    echo "There was an error in the websites backup for ${HOSTNAME}: ${TIMESTAMP}. See /var/log/server-backup.log for more info."| mail -s "Websites Backup Error, ${HOSTNAME}" ${EMAIL}
   else
     # rsync Success condition
     FINISHED=$(date "+%Y-%m-%d-%H:%M:%S")
@@ -98,7 +97,7 @@ function rsync_backup {
     then
       # rsync & mysqldump worked OK
       echo "SUCCESS. Backup made on: ${TIMESTAMP}" >> /var/log/server-backup.log
-      echo -e "Server ${HOSTNAME} successfully ran a local backup of websites and databases.\nBoth rsync & mysqldump report success.\nStarted: ${TIMESTAMP}. Finished: ${FINISHED}"| mail -s "Backup Success: websites: ${HOSTNAME}" ${EMAIL}
+      echo -e "Server ${HOSTNAME} successfully ran a local backup of websites and databases.\nBoth rsync & mysqldump report success.\nStarted: ${TIMESTAMP}. Finished: ${FINISHED}"| mail -s "Backup Success, Websites: ${HOSTNAME}" ${EMAIL}
     else
       # rsync worked but there was at least one mysqldump error
       echo "PARTIAL SUCCESS. File backup (rsync) was successful, but mysqldump reports errors: ${TIMESTAMP}" >> /var/log/server-backup.log
@@ -109,12 +108,10 @@ function rsync_backup {
 
 # ------------------------------------------------------------------------------
 # Remove the symlink to the target directory from `$STORAGE/current` and add a
-# symlink to the most recent copied directory to `$STORAGE/current`.
-#
-# This allows rsync to use the most recent backup as the `--link-dest` comparison
+# symlink to the most recent copied directory to `$STORAGE/current`. This allows
+# rsync to use the most recent backup as the `--link-dest` comparison
 # on the next run.
-#
-# See: http://stackoverflow.com/a/34862475
+# See: http://dev-notes.eu/2017/10/symlinking-to-directories-in-linux/
 # ------------------------------------------------------------------------------
 function setup_for_next_run {
   rm -rf $STORAGE/current
@@ -123,7 +120,6 @@ function setup_for_next_run {
 
 # ------------------------------------------------------------------------------
 # Remove old backup directories.
-#
 # Retains n directories, set in the config area of this script.
 # ------------------------------------------------------------------------------
 function delete_oldest_n_copies {
