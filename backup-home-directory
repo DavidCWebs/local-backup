@@ -6,13 +6,14 @@ if [[ -z $1 ]]; then
 else
   CURRENT_USER=$1
 fi
+
 # Set config variables and make directories/symlinks
 # ------------------------------------------------------------------------------
 function setup {
   THIS=$(readlink -f ${BASH_SOURCE[0]})
   PROJECT_DIR=$(dirname $THIS)
   . "$PROJECT_DIR/config"
-  EXCLUDE_LIST="/home/$CURRENT_USER/.backup-settings/excludes.txt"
+  EXCLUDE_LIST="/home/$CURRENT_USER/.backup-settings/exclude-home-backup"
   RETAIN_NUMBER=8 # Remember to account for n+1 and the `current` dir
   SRC="/home/$CURRENT_USER/" # The source for rsync
   TIMESTAMP=$(date "+%Y-%m-%d-%H:%M:%S") # Timestamp for directory name
@@ -48,8 +49,8 @@ function transfer_files {
   echo "----------------------------------" >> ${LOGFILE}
   # --exclude-from=${EXCLUDE_LIST} --stats
   # OPT=(-avL --delete --link-dest=${LNK})
-  OPT=(-rltDv --info=COPY1,BACKUP1,SKIP2,FLIST2 --link-dest=${LNK})
-  rsync "${OPT[@]}" ${SRC} ${TRG} 2>&1 >> ${LOGFILE} # Append STDERR and STDOUT to a single logfile
+  OPT=(-rltDv --exclude-from=${EXCLUDE_LIST} --link-dest=${LNK})
+  rsync "${OPT[@]}" ${SRC} ${TRG} 2>&1 >> ${LOGFILE}
 }
 
 # Remove the symlink to the target directory from `$STORAGE/current` and add a
