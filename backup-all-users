@@ -1,0 +1,8 @@
+#!/bin/bash
+# Backup home directories for all users that have them.
+# ------------------------------------------------------------------------------
+for DIR in /home/*/; do
+  USERNAME="${DIR%/}"
+  USERNAME="${USERNAME##*/}"
+  backup-home-directory ${USERNAME}
+done
