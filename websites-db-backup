@@ -18,6 +18,9 @@
 # you to safely add the MySQL user password in this script, which is essential when
 # the script is adapted for use on a public-facing server. See `create-backup-user.sql`
 # in this repo for instructions on creating a MySQL backup user.
+#
+# Mail reporting assumes the `mail` command is available:
+# `sudo apt install mailutils`.
 
 # ------------------------------------------------------------------------------
 # Config
