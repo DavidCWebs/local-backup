@@ -2,7 +2,9 @@
 #
 # Backup Script for LOCAL development websites: files and MySQL databases.
 #
-# Tested on Ubuntu 16.04 Xenial Xerus.
+# Tested on:
+# - Ubuntu 16.04 Xenial Xerus.
+# - Ubuntu 20.04 Focal Fossa.
 #
 # rsync Options
 # -a, --archive               archive mode; equals -rlptgoD (no -H,-A,-X)
